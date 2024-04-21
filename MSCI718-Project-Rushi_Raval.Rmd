@@ -1,0 +1,421 @@
+---
+title: "MSCI718-Project"
+author: "Rushi Raval"
+date: "2024-03-24"
+output: html_document
+---
+
+`{install.packages("brms")} install.packages("dplyr")`
+
+```{r cars}
+install.packages("corrplot")
+
+```
+
+## Libraries that will be used further
+
+```{r cars}
+library(brms) 
+library(corrplot)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(stringr)
+library(nnet)
+library(broom)
+library(bayesplot)
+library(nnet)
+library(dplyr)
+library(MASS)
+library(ggplot2)
+library(lattice)
+library(Hmisc)
+library(ggcorrplot)
+library(gridExtra)
+library(memisc)
+library(ROCR)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(rms)
+library(randomForest)
+library(mediation)
+```
+
+## Code
+
+Load the csv file:
+
+```{r cars}
+
+file_path <- "Collision.csv"
+data <- read.csv(file_path)
+
+
+
+print(data)
+
+
+data <- data[, !(colnames(data) %in% c("X", "Y", "ID", "Geo_ID", "Accident_Date", 
+                     "Location", "Num_of_Injuries", "Num_of_Minimal_Injuries", 
+                     "Num_of_Minor_Injuries", "Num_of_Major_Injuries", 
+                     "Num_of_Fatal_Injuries", "X_Coordinate", "Y_Coordinate", 
+                     "Lat", "Long", "ObjectId"))]
+
+
+```
+
+## Plotting injuries
+
+Code:
+
+```{r cars}
+
+data <- data[data$Max_Injury != "00 - None" & data$Max_Injury != "None" & data$Max_Injury != "", ]
+
+
+# Create the pie chart for types of injuries
+ggplot(data, aes(x = "", fill = Max_Injury)) +
+  geom_bar(width = 1) +
+  coord_polar("y", start = 0) +
+  labs(title = "Types of Injuries", 
+       fill = "Type of Injury") +
+  theme_void()  # Remove unnecessary elements
+
+
+```
+
+## Plotting accidents with respect to each year
+
+Code:
+
+```{r cars}
+
+
+ggplot(data, aes(x = factor(Accident_Year))) +
+  geom_bar() +
+  labs(title = "Distribution of Accidents by Year", 
+       x = "Accident_Year",
+       y = "Count") +
+  scale_x_discrete(labels = unique(data$Accident_Year)) +  # Set x-axis labels to unique years
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for better visibility
+        plot.title = element_text(hjust = 0.5))
+
+
+```
+
+## Plotting Accidents with respect to weather conditions
+
+Code:
+
+```{r cars}
+
+data <- data[data$Environment_Condition != "00 - Unknown" ,]
+
+
+# Create the pie chart for types of injuries
+ggplot(data, aes(x = "", fill = Environment_Condition)) +
+  geom_bar(width = 1) +
+  coord_polar("y", start = 0) +
+  labs(title = "Types of Environment_Conditions", 
+       fill = "Type of Environment_Condition") +
+  theme_void()  # Remove unnecessary elements
+```
+
+## Plotting accidents with respect to time
+
+Code:
+
+```{r cars}
+
+# Convert the "Time_Range" column to a factor with specified levels
+
+ggplot(data, aes(x = Time_Range)) +
+  geom_bar() +  # Use geom_bar() for a bar plot
+  labs(x = "Time Range", y = "Count") +  # Add axis labels
+  ggtitle("Distribution of Time Ranges") +
+  theme(
+    text = element_text(size = 20)  # Set the font size to 16
+  )# Add plot title
+
+
+```
+
+## Filter Data and do label encoding
+
+Code:
+
+```{r cars}
+
+categorical_cols <- names(data)[sapply(data, is.character)]
+
+# Convert categorical columns to factors, then to numeric, and subtract 1 to start from 0
+data[categorical_cols] <- lapply(data[categorical_cols], function(col) as.numeric(as.factor(col)) - 1)
+
+
+```
+## Correlation matrix
+
+Code:
+
+```{r cars}
+
+head(data)
+
+filled_data <- data
+filled_data[, sapply(data, is.numeric)] <- lapply(data[, sapply(data, is.numeric)], function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
+
+# Compute correlation matrix
+correlation_matrix <- cor(filled_data[, sapply(filled_data, is.numeric)])
+
+# Plot the heatmap
+corrplot(correlation_matrix, method = "color", type = "upper", tl.cex = 0.6, cl.cex = 0.6, number.cex = 0.7, tl.col = "black")
+
+par(cex.main = 1.7, cex.lab = 1.4, cex.axis = 1.4)
+corrplot(correlation_matrix, method = "color", type = "upper", tl.cex = 1, cl.cex = 1, number.cex = 1, tl.col = "black")
+
+print(correlation_matrix)
+
+```
+## Linear regression and identify useful features
+
+Code:
+
+```{r cars}
+
+lm_model <- lm(Max_Injury ~ Classification_Of_Accident + Time_Range + Location_Type + Initial_Impact_Type + Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, data = data)
+
+step(lm_model)
+variable_selection <- step(lm_model)
+summary(variable_selection)
+
+```
+
+## Multiple Linear regression
+
+Code:
+
+```{r cars}
+
+lm_model1 <- lm(Max_Injury ~ Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, data = data)
+
+lm_model2 <- lm(Max_Injury ~ Initial_Impact_Type + Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, data = data)
+
+lm_model3 <- lm(Max_Injury ~ Classification_Of_Accident + Time_Range + Initial_Impact_Type + Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, data = data)
+
+lm_model4 <- lm(Max_Injury ~ Location_Type + Time_Range + Classification_Of_Accident + Initial_Impact_Type + Road_Surface_Condition + Environment_Condition + Light + Traffic_Control + Num_of_Vehicle + Num_Of_Pedestrians
+, data = data)
+
+mtable(lm_model1, lm_model2, lm_model3, lm_model4,  sdigits = 2)
+
+set.seed(123)  # for reproducibility
+train_indices <- sample(nrow(data), 0.7 * nrow(data))  # 70% train, 30% test
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+
+predicted_values <- predict(lm_model4, newdata = test_data)
+
+
+actual_values <- test_data$Max_Injury
+
+# Mean Absolute Error (MAE)
+mae <- mean(abs(predicted_values - actual_values))
+
+# Mean Squared Error (MSE)
+mse <- mean((predicted_values - actual_values)^2)
+
+# Root Mean Squared Error (RMSE)
+rmse <- sqrt(mse)
+
+cat(mse)
+
+
+
+
+
+
+```
+
+## Finding mediator
+
+Code:
+
+```{r cars}
+
+mediator_variable <- data$Environment_Condition
+
+# Define the mediator model
+mediator_model <- lm(Road_Surface_Condition ~ Max_Injury + Location_Type + Time_Range + Classification_Of_Accident + Environment_Condition + Road_Surface_Condition + Light + Traffic_Control + Num_of_Vehicle + Num_Of_Pedestrians, data = data)
+
+# Define the outcome model
+outcome_model <- lm(Max_Injury ~ Location_Type + Time_Range + Classification_Of_Accident + Initial_Impact_Type + Road_Surface_Condition + Environment_Condition + Light + Traffic_Control + Num_of_Vehicle + Num_Of_Pedestrians + Environment_Condition, data = data)
+
+# Perform mediation analysis
+mediation_results <- mediate(mediator_model, outcome_model, treat = "Environment_Condition", mediator="Road_Surface_Condition")
+
+# View the results
+summary(mediation_results)
+
+```
+
+## Finding moderator
+
+Code:
+
+```{r cars}
+
+# Assuming you have your lm_model4 already defined
+lm_model4 <- lm(Max_Injury ~ Location_Type + Time_Range + Classification_Of_Accident + Initial_Impact_Type + Road_Surface_Condition + Environment_Condition + Light + Traffic_Control + Num_of_Vehicle + Num_Of_Pedestrians, data = data)
+
+# Specify candidate moderator variables (replace "Moderator_Variable" with actual variable names)
+candidate_mod_vars <- c("Traffic_Control") 
+
+# Loop through each candidate moderator variable
+# Loop through each candidate moderator variable
+for (mod_var in candidate_mod_vars) {
+  # Create interaction plot
+  ggplot(data, aes(x = data[[mod_var]], y = Max_Injury, color = Traffic_Control)) +
+    geom_line(aes(group = interaction(Location_Type, data[[mod_var]]))) +
+    geom_point() +
+    labs(x = mod_var, y = "Traffic_Control", title = paste("Interaction Plot for", mod_var)) +
+    theme_minimal()
+}
+
+
+```
+
+## Finding confoudner
+
+Code:
+
+```{r cars}
+
+# Calculate correlation matrix
+correlation_matrix <- cor(data[c("Max_Injury", "Location_Type", "Time_Range", "Classification_Of_Accident", "Initial_Impact_Type", "Road_Surface_Condition", "Environment_Condition", "Light", "Traffic_Control", "Num_of_Vehicle", "Num_Of_Pedestrians")])
+
+# Get correlation coefficients with the outcome variable
+cor_with_max_injury <- correlation_matrix["Max_Injury", ]
+
+# Identify variables with high correlation coefficients
+confounding_variables <- names(which(abs(cor_with_max_injury) > 0.1 & names(cor_with_max_injury) != "Max_Injury"))
+
+# Print potential confounding variables
+print(confounding_variables)
+
+```
+
+## Ordinal Logistic Regression
+
+Code:
+
+```{r cars}
+
+data$Max_Injury <- factor(data$Max_Injury, ordered = T)
+
+brm_fit_ord <- brm(Max_Injury ~ Classification_Of_Accident+ Time_Range + Initial_Impact_Type + Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, data = data, family = cumulative(), chains = 1, core = 2, iter = 2000)
+
+summary(brm_fit_ord)
+
+predict(brm_fit_ord)
+
+bayes_R2 (brm_fit_ord)
+
+
+set.seed(123)  # For reproducibility
+train_indices <- sample(nrow(data), 0.8 * nrow(data))  # 70% for training
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+
+predicted_probs <- predict(brm_fit_ord, newdata = test_data, type = "response")
+
+# Convert predicted probabilities to predicted ordinal values
+predicted_values <- apply(predicted_probs, 1, function(x) which.max(x) - 1)
+
+# Calculate accuracy
+accuracy <- mean(predicted_values == test_data$Max_Injury)
+
+# Print the accuracy
+cat("Accuracy:", accuracy, "\n")
+
+```
+
+## Multinomial-Logistic Regression
+
+Code:
+
+```{r cars}
+
+model_glm <- multinom(Max_Injury ~ Location_Type + Classification_Of_Accident + 
+    Initial_Impact_Type + Road_Surface_Condition + Environment_Condition + 
+    Light + Traffic_Control + Num_of_Vehicle, 
+                      data = data)
+
+summary(model_glm)
+
+```
+
+## Multinomial-logistic regression using brms
+
+Code:
+
+```{r cars}
+
+
+# Convert "Max_Injury" to a factor
+class(data$Max_Injury)
+
+
+# Now try fitting the model again
+bayesian_model <- brm(
+  formula = Max_Injury ~ Num_of_Vehicle + Initial_Impact_Type + 
+    Road_Surface_Condition + Light + Traffic_Control + Environment_Condition, 
+  data = data, 
+  family = categorical(link = "logit"), 
+  chains = 1,           # The number of Markov chains
+  cores = 2,
+  iter = 2000,# The number of iterations per chain
+  warmup = 1000,
+  algorithm = "sampling"
+)
+
+# Print the summary of the model
+summary(bayesian_model)
+
+
+```
+
+## Decision Tree
+
+Code:
+
+```{r cars}
+
+
+# Convert "Max_Injury" to a factor
+set.seed(123) # for reproducibility
+
+data$Light <- factor(data$Light, levels = unique(data$Light))
+data$Road_Surface_Condition <- factor(data$Road_Surface_Condition, levels = unique(data$Road_Surface_Condition))
+data$Traffic_Control  <- factor(data$Traffic_Control , levels = unique(data$Traffic_Control ))
+
+
+train_indices <- createDataPartition(data$Max_Injury, p = 0.7, list = FALSE)
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+
+# Create a decision tree model using the training data
+decision_tree <- rpart(Max_Injury ~ Num_of_Vehicle + Initial_Impact_Type + 
+    Road_Surface_Condition + Light + Traffic_Control + Environment_Condition,
+                       data = train_data,
+                       method = "class")
+
+data <- data[data$Light != "00 - Unknown" ,]
+
+# Make predictions on the test data
+predictions <- predict(decision_tree, newdata = test_data, type = "class")
+
+# Calculate accuracy
+accuracy <- mean(predictions == test_data$Max_Injury)
+cat("Accuracy:", accuracy, "\n")
+
+```
