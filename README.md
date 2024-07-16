@@ -1,4 +1,5 @@
 # Analysis of Injury Severity in Traffic Collision based on Surrounding Factors
+<img src="accident.jpeg" alt="thumbnail" width="50%">
 
 ## Overview
 This repository contains an analysis of injury severity in traffic collisions based on surrounding factors using the Traffic Collision dataset from Ottawa's website. The analysis aims to understand how factors such as location type, road conditions, lighting, and environmental conditions affect injury severity.
